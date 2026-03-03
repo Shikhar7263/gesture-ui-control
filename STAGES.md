@@ -53,6 +53,7 @@ All 10 gesture types are detected and labelled:
 |---|---|
 | Hand movement | Move cursor (exponential smoothing) |
 | Pinch | Left click |
+| OK Sign | Double click |
 | Scroll Up | Scroll wheel up / Page Up |
 | Scroll Down | Scroll wheel down / Page Down |
 | Thumbs Up | Media Play/Pause |

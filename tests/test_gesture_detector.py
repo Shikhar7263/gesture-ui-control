@@ -288,6 +288,12 @@ class TestMouseController:
         result = mc.right_click()
         assert result is False
 
+    def test_double_click_disabled(self):
+        cfg = Config(enable_mouse_control=False)
+        mc = MouseController(cfg)
+        result = mc.double_click()
+        assert result is False
+
     def test_scroll_does_not_raise(self):
         mc = MouseController(Config())
         mc.scroll("up")

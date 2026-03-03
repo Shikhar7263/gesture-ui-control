@@ -67,7 +67,7 @@ real time.
 | **Pinch** | Thumb + index tips touching (< 0.05 normalized distance) | Left click |
 | **Thumbs Up** | Only thumb extended upward | Play / Pause media |
 | **Peace Sign** | Index + middle fingers up | — |
-| **OK Sign** | Thumb + index circle, other fingers extended | OK |
+| **OK Sign** | Thumb + index circle, other fingers extended | Double click |
 | **Pointing Up** | Only index finger extended | — |
 | **Scroll Up** | Index + middle raised high (wrist low) | Scroll / Page Up |
 | **Scroll Down** | Ring + pinky up, index + middle down | Scroll / Page Down |
