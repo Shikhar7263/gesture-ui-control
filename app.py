@@ -110,6 +110,8 @@ def _process_frames() -> None:
 
             if result.gesture == GestureType.PINCH:
                 mouse_controller.left_click()
+            elif result.gesture == GestureType.OK_SIGN:
+                mouse_controller.double_click()
             elif result.gesture == GestureType.SCROLL_UP:
                 mouse_controller.scroll("up")
             elif result.gesture == GestureType.SCROLL_DOWN:
@@ -271,7 +273,7 @@ def _gesture_description(g: GestureType) -> str:
         GestureType.PEACE_SIGN: "Index + middle fingers up — peace sign",
         GestureType.FIST: "All fingers curled — stop media",
         GestureType.OPEN_PALM: "All 5 fingers extended — open palm",
-        GestureType.OK_SIGN: "Thumb + index circle — OK",
+        GestureType.OK_SIGN: "Thumb + index circle — double click",
         GestureType.POINTING_UP: "Only index finger extended — pointing up",
         GestureType.SCROLL_UP: "Index + middle pointing high — scroll up",
         GestureType.SCROLL_DOWN: "Ring + pinky up — scroll down",

@@ -78,6 +78,8 @@ def main() -> None:
 
                 if result.gesture == GestureType.PINCH:
                     mouse.left_click()
+                elif result.gesture == GestureType.OK_SIGN:
+                    mouse.double_click()
                 elif result.gesture == GestureType.SCROLL_UP:
                     mouse.scroll("up")
                 elif result.gesture == GestureType.SCROLL_DOWN:
