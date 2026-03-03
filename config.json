@@ -1,0 +1,14 @@
+{
+  "camera_index": 0,
+  "frame_width": 640,
+  "frame_height": 480,
+  "min_detection_confidence": 0.7,
+  "min_tracking_confidence": 0.7,
+  "mouse_smoothing": 0.5,
+  "click_cooldown": 0.3,
+  "gesture_cooldown": 0.5,
+  "scroll_speed": 7,
+  "enable_mouse_control": true,
+  "enable_keyboard_control": true,
+  "screen_margin": 50
+}

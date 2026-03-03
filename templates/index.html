@@ -313,9 +313,18 @@
     badge.classList.remove('connected');
   });
 
+  socket.on('status', data => {
+    // Sync button states and gesture label to the server's current state
+    // immediately after the SocketIO connection is established.
+    // Confidence is unknown at connect time, so it is reset to 0.
+    updateGestureUI(data.current_gesture, 0);
+    refreshStatus();
+  });
+
   socket.on('gesture_event', data => {
     updateGestureUI(data.gesture, data.confidence);
     prependHistory(data);
+    highlightGestureCard(data.gesture);
   });
 
   // ── Gesture UI ────────────────────────────────────────────────────
@@ -334,6 +343,12 @@
     list.prepend(li);
     // Keep at most 10 visible entries
     while (list.children.length > 10) list.removeChild(list.lastChild);
+  }
+
+  function highlightGestureCard(gestureValue) {
+    document.querySelectorAll('.gesture-card').forEach(card => card.classList.remove('active'));
+    const match = document.querySelector(`.gesture-card[data-gesture="${gestureValue}"]`);
+    if (match) match.classList.add('active');
   }
 
   // ── Start / Stop ──────────────────────────────────────────────────
@@ -423,6 +438,7 @@
       gestures.filter(g => g.value !== 'none').forEach(g => {
         const card = document.createElement('div');
         card.className = 'gesture-card';
+        card.dataset.gesture = g.value;
         card.innerHTML = `<div class="gname">${g.name.replace(/_/g,' ')}</div>
                           <div class="gdesc">${g.description}</div>`;
         grid.appendChild(card);
