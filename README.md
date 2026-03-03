@@ -130,6 +130,20 @@ gesture-ui-control/
 
 ---
 
+## 🗺️ Stage-Wise Development
+
+The project is built in three progressive stages — each runnable on its own:
+
+| Stage | Entry point | What it does |
+|---|---|---|
+| **Stage 1** — Gesture Detection | `stages/stage1_gesture_detection.py` | MediaPipe hand tracking + console output |
+| **Stage 2** — System Control | `stages/stage2_system_control.py` | Stage 1 + mouse & keyboard automation |
+| **Stage 3** — Web Dashboard | `app.py` | Stage 2 + Flask web UI + live video + SocketIO |
+
+See **[STAGES.md](STAGES.md)** for the full breakdown, feature comparison table, and per-stage dependency list.
+
+---
+
 ## 🧪 Running Tests
 
 ```bash
