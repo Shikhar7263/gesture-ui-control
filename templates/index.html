@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture UI Control</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            margin: 0;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+        video {
+            border: 1px solid #ccc;
+            width: 80%;
+            max-width: 600px;
+            height: auto;
+        }
+        #stats {
+            margin-top: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Live Webcam Feed with Gesture Detection</h1>
+    <video id="webcam" autoplay></video>
+    <div id="tracking" style="visibility:hidden;">
+        <canvas id="gestureCanvas"></canvas>
+    </div>
+    <div id="stats">
+        <h2>Gesture Statistics</h2>
+        <p id="gestureOutput">Gesture Detected: None</p>
+        <p id="controlSettings">Control Settings: Default</p>
+    </div>
+    <script>
+        const video = document.getElementById('webcam');
+        const gestureOutput = document.getElementById('gestureOutput');
+        const controlSettings = document.getElementById('controlSettings');
+
+        // Access the webcam
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error('Error accessing webcam: ', err);
+            });
+
+        // Placeholder for gesture detection and tracking logic
+        function detectGestures() {
+            // Simulate gesture detection
+            setInterval(() => {
+                const detectedGesture = 'Wave'; // Simulate detecting a gesture
+                gestureOutput.textContent = 'Gesture Detected: ' + detectedGesture;
+            }, 2000);
+        }
+
+        detectGestures(); // Start gesture detection
+    </script>
+</body>
+</html>
