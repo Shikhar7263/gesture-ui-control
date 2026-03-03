@@ -320,6 +320,12 @@
     prependHistory(data);
   });
 
+  socket.on('status', data => {
+    // Sync button states and gesture label immediately after SocketIO connects.
+    updateGestureUI(data.current_gesture, 0);
+    refreshStatus();
+  });
+
   // ── Gesture UI ────────────────────────────────────────────────────
   let _activeGestureCard = null;
 

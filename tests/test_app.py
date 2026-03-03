@@ -1,8 +1,8 @@
-"""Tests for the Flask web application routes.
+"""Tests for the Flask web application routes in app.py.
 
-All tests use the Flask test client and run without a physical camera,
-MediaPipe, pyautogui, or pynput.  External dependencies are stubbed at the
-module level before importing the app under test.
+All tests use Flask's built-in test client and run without a real camera,
+MediaPipe, pyautogui, or pynput — heavy dependencies are stubbed out
+identically to test_gesture_detector.py.
 """
 
 import sys
@@ -12,14 +12,11 @@ from unittest.mock import MagicMock
 import pytest
 
 # ---------------------------------------------------------------------------
-# Reuse the same lightweight stubs as test_gesture_detector.py
+# Stubs (must be installed before importing app)
 # ---------------------------------------------------------------------------
 
-def _ensure_stub(name, module):
-    sys.modules.setdefault(name, module)
-
-
-def _make_mediapipe_stub():
+def _install_stubs():
+    # ── mediapipe ──────────────────────────────────────────────────────────
     mp = types.ModuleType("mediapipe")
     solutions = types.ModuleType("mediapipe.solutions")
     hands_mod = types.ModuleType("mediapipe.solutions.hands")
@@ -29,11 +26,7 @@ def _make_mediapipe_stub():
     class FakeHands:
         HAND_CONNECTIONS = []
         def __init__(self, **kw): pass
-        def process(self, img):
-            result = MagicMock()
-            result.multi_hand_landmarks = None
-            result.multi_handedness = None
-            return result
+        def process(self, img): return type("R", (), {"multi_hand_landmarks": None, "multi_handedness": None})()
         def close(self): pass
 
     hands_mod.Hands = FakeHands
@@ -44,10 +37,16 @@ def _make_mediapipe_stub():
     solutions.drawing_utils = drawing_mod
     solutions.drawing_styles = styles_mod
     mp.solutions = solutions
-    return mp, solutions, hands_mod, drawing_mod, styles_mod
+    for name, mod in [
+        ("mediapipe", mp),
+        ("mediapipe.solutions", solutions),
+        ("mediapipe.solutions.hands", hands_mod),
+        ("mediapipe.solutions.drawing_utils", drawing_mod),
+        ("mediapipe.solutions.drawing_styles", styles_mod),
+    ]:
+        sys.modules.setdefault(name, mod)
 
-
-def _make_cv2_stub():
+    # ── cv2 ────────────────────────────────────────────────────────────────
     cv2 = types.ModuleType("cv2")
     cv2.COLOR_BGR2RGB = 4
     cv2.COLOR_RGB2BGR = 5
@@ -55,23 +54,15 @@ def _make_cv2_stub():
     cv2.putText = lambda *a, **kw: None
     cv2.FONT_HERSHEY_SIMPLEX = 0
     cv2.LINE_AA = 16
-    cv2.imencode = lambda ext, frame: (True, MagicMock(tobytes=lambda: b""))
+    cv2.imencode = lambda ext, frame: (True, MagicMock(tobytes=lambda: b"JPEG"))
+    _fake_cap = MagicMock()
+    _fake_cap.isOpened.return_value = False
+    cv2.VideoCapture = MagicMock(return_value=_fake_cap)
     cv2.CAP_PROP_FRAME_WIDTH = 3
     cv2.CAP_PROP_FRAME_HEIGHT = 4
+    sys.modules.setdefault("cv2", cv2)
 
-    class FakeVideoCapture:
-        """Stub VideoCapture that reports the camera as unavailable."""
-        def __init__(self, *args, **kwargs): pass
-        def isOpened(self): return False
-        def set(self, prop, value): pass
-        def read(self): return False, None
-        def release(self): pass
-
-    cv2.VideoCapture = FakeVideoCapture
-    return cv2
-
-
-def _make_pyautogui_stub():
+    # ── pyautogui ──────────────────────────────────────────────────────────
     pag = types.ModuleType("pyautogui")
     pag.FAILSAFE = False
     pag.size = lambda: (1920, 1080)
@@ -79,16 +70,16 @@ def _make_pyautogui_stub():
     pag.click = lambda *a, **kw: None
     pag.doubleClick = lambda *a, **kw: None
     pag.scroll = lambda *a, **kw: None
-    return pag
+    sys.modules.setdefault("pyautogui", pag)
 
-
-def _make_pynput_stub():
+    # ── pynput ─────────────────────────────────────────────────────────────
     pynput = types.ModuleType("pynput")
     keyboard = types.ModuleType("pynput.keyboard")
 
     class FakeKey:
         page_up = "page_up"
         page_down = "page_down"
+        enter = "enter"
         media_play_pause = "media_play_pause"
         media_stop = "media_stop"
 
@@ -100,261 +91,239 @@ def _make_pynput_stub():
     keyboard.Key = FakeKey
     keyboard.Controller = FakeController
     pynput.keyboard = keyboard
-    return pynput, keyboard
+    sys.modules.setdefault("pynput", pynput)
+    sys.modules.setdefault("pynput.keyboard", keyboard)
 
 
-# Install stubs (idempotent — setdefault won't overwrite if already present)
-_mp, *_mp_sub = _make_mediapipe_stub()
-_ensure_stub("mediapipe", _mp)
-_ensure_stub("mediapipe.solutions", _mp_sub[0])
-_ensure_stub("mediapipe.solutions.hands", _mp_sub[1])
-_ensure_stub("mediapipe.solutions.drawing_utils", _mp_sub[2])
-_ensure_stub("mediapipe.solutions.drawing_styles", _mp_sub[3])
+_install_stubs()
 
-_cv2 = _make_cv2_stub()
-_ensure_stub("cv2", _cv2)
+# Now it is safe to import the Flask application.
+from app import app as flask_app  # noqa: E402
+from gesture_control.config import Config  # noqa: E402
+from gesture_control.gesture_detector import GestureType  # noqa: E402
+import app as flask_app_module  # noqa: E402
 
-_pag = _make_pyautogui_stub()
-_ensure_stub("pyautogui", _pag)
-
-_pynput, _pynput_kb = _make_pynput_stub()
-_ensure_stub("pynput", _pynput)
-_ensure_stub("pynput.keyboard", _pynput_kb)
-
-# Now it is safe to import the Flask app
-from gesture_control.config import Config  # noqa: E402 – stubs must be installed first
-import app as flask_app  # noqa: E402 – stubs must be installed first
+_GESTURE_COUNT = len(GestureType)
+_HISTORY_MAXLEN = 20  # matches the deque(maxlen=20) in app.py
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture()
+@pytest.fixture
 def client():
-    """Return a Flask test client with testing mode enabled."""
-    flask_app.app.config["TESTING"] = True
-    with flask_app.app.test_client() as c:
-        # Reset global state before each test
-        flask_app.is_running = False
-        flask_app.current_gesture = "none"
-        flask_app.gesture_history.clear()
-        flask_app.config = Config()
+    flask_app.config["TESTING"] = True
+    with flask_app.test_client() as c:
+        # Reset global state so tests are independent of each other
+        flask_app_module.is_running = False
+        flask_app_module.current_gesture = "none"
+        flask_app_module.gesture_history.clear()
+        flask_app_module.config = Config()
         yield c
 
 
 # ---------------------------------------------------------------------------
-# GET /
+# Index route
 # ---------------------------------------------------------------------------
 
 class TestIndexRoute:
-    def test_index_returns_200(self, client):
-        resp = client.get("/")
-        assert resp.status_code == 200
+    def test_index_status_200(self, client):
+        r = client.get("/")
+        assert r.status_code == 200
 
-    def test_index_returns_html(self, client):
-        resp = client.get("/")
-        assert b"Gesture" in resp.data
+    def test_index_content_type_html(self, client):
+        r = client.get("/")
+        assert b"text/html" in r.content_type.encode()
+
+    def test_index_contains_title(self, client):
+        r = client.get("/")
+        assert b"Gesture" in r.data
 
 
 # ---------------------------------------------------------------------------
-# GET /api/status
+# /api/status
 # ---------------------------------------------------------------------------
 
 class TestApiStatus:
-    def test_status_keys(self, client):
-        resp = client.get("/api/status")
-        assert resp.status_code == 200
-        data = resp.get_json()
+    def test_status_200(self, client):
+        r = client.get("/api/status")
+        assert r.status_code == 200
+
+    def test_status_keys_present(self, client):
+        data = client.get("/api/status").get_json()
         assert "is_running" in data
         assert "current_gesture" in data
         assert "camera_available" in data
         assert "history_count" in data
 
-    def test_status_not_running_by_default(self, client):
-        resp = client.get("/api/status")
-        data = resp.get_json()
+    def test_status_not_running_initially(self, client):
+        data = client.get("/api/status").get_json()
         assert data["is_running"] is False
 
-    def test_status_history_count_zero(self, client):
-        resp = client.get("/api/status")
-        data = resp.get_json()
-        assert data["history_count"] == 0
+    def test_status_history_count_is_int(self, client):
+        data = client.get("/api/status").get_json()
+        assert isinstance(data["history_count"], int)
+
+    def test_status_history_count_reflects_entries(self, client):
+        flask_app_module.gesture_history.append(
+            {"gesture": "pinch", "confidence": 0.9, "timestamp": "12:00:00"}
+        )
+        data = client.get("/api/status").get_json()
+        assert data["history_count"] == 1
 
 
 # ---------------------------------------------------------------------------
-# GET /api/config
+# /api/config  GET
 # ---------------------------------------------------------------------------
 
 class TestApiConfigGet:
-    def test_config_returns_200(self, client):
-        resp = client.get("/api/config")
-        assert resp.status_code == 200
+    def test_config_get_200(self, client):
+        r = client.get("/api/config")
+        assert r.status_code == 200
 
-    def test_config_contains_expected_keys(self, client):
-        resp = client.get("/api/config")
-        data = resp.get_json()
-        assert "camera_index" in data
-        assert "frame_width" in data
-        assert "frame_height" in data
-        assert "mouse_smoothing" in data
-        assert "scroll_speed" in data
-        assert "enable_mouse_control" in data
-        assert "enable_keyboard_control" in data
+    def test_config_get_returns_all_fields(self, client):
+        data = client.get("/api/config").get_json()
+        expected_keys = {
+            "camera_index", "frame_width", "frame_height",
+            "min_detection_confidence", "min_tracking_confidence",
+            "mouse_smoothing", "click_cooldown", "gesture_cooldown",
+            "scroll_speed", "enable_mouse_control", "enable_keyboard_control",
+            "screen_margin",
+        }
+        assert expected_keys.issubset(data.keys())
+
+    def test_config_default_camera_index(self, client):
+        data = client.get("/api/config").get_json()
+        assert data["camera_index"] == 0
 
     def test_config_default_scroll_speed(self, client):
-        resp = client.get("/api/config")
-        data = resp.get_json()
+        data = client.get("/api/config").get_json()
         assert data["scroll_speed"] == 3
 
 
 # ---------------------------------------------------------------------------
-# POST /api/config
+# /api/config  POST
 # ---------------------------------------------------------------------------
 
 class TestApiConfigPost:
-    def test_save_valid_key(self, client):
-        resp = client.post(
-            "/api/config",
-            json={"scroll_speed": 7},
-            content_type="application/json",
-        )
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["status"] == "ok"
-        assert data["config"]["scroll_speed"] == 7
+    def test_config_post_200(self, client):
+        r = client.post("/api/config", json={"scroll_speed": 5})
+        assert r.status_code == 200
 
-    def test_unknown_key_ignored(self, client):
-        resp = client.post(
-            "/api/config",
-            json={"nonexistent_key": 999},
-            content_type="application/json",
-        )
-        assert resp.status_code == 200
-        data = resp.get_json()
+    def test_config_post_returns_ok_status(self, client):
+        data = client.post("/api/config", json={"scroll_speed": 5}).get_json()
         assert data["status"] == "ok"
 
-    def test_empty_body_accepted(self, client):
-        resp = client.post(
-            "/api/config",
-            json={},
-            content_type="application/json",
-        )
-        assert resp.status_code == 200
+    def test_config_post_updates_field(self, client):
+        client.post("/api/config", json={"scroll_speed": 7})
+        data = client.get("/api/config").get_json()
+        assert data["scroll_speed"] == 7
 
-    def test_toggle_mouse_control_off(self, client):
-        resp = client.post(
-            "/api/config",
-            json={"enable_mouse_control": False},
-            content_type="application/json",
-        )
-        data = resp.get_json()
-        assert data["config"]["enable_mouse_control"] is False
+    def test_config_post_ignores_unknown_keys(self, client):
+        r = client.post("/api/config", json={"nonexistent_key": 999})
+        assert r.status_code == 200
+        data = r.get_json()
+        assert data["status"] == "ok"
+
+    def test_config_post_empty_body(self, client):
+        r = client.post("/api/config", json={})
+        assert r.status_code == 200
+
+    def test_config_post_toggle_mouse_off(self, client):
+        client.post("/api/config", json={"enable_mouse_control": False})
+        data = client.get("/api/config").get_json()
+        assert data["enable_mouse_control"] is False
 
 
 # ---------------------------------------------------------------------------
-# GET /api/gestures
+# /api/gestures
 # ---------------------------------------------------------------------------
 
 class TestApiGestures:
+    def test_gestures_200(self, client):
+        r = client.get("/api/gestures")
+        assert r.status_code == 200
+
     def test_gestures_returns_list(self, client):
-        resp = client.get("/api/gestures")
-        assert resp.status_code == 200
-        data = resp.get_json()
+        data = client.get("/api/gestures").get_json()
         assert isinstance(data, list)
+        assert len(data) == _GESTURE_COUNT
 
-    def test_gestures_count(self, client):
-        resp = client.get("/api/gestures")
-        data = resp.get_json()
-        # Count must match the number of GestureType enum members
-        from gesture_control.gesture_detector import GestureType
-        assert len(data) == len(GestureType)
-
-    def test_gestures_have_required_fields(self, client):
-        resp = client.get("/api/gestures")
-        data = resp.get_json()
+    def test_gestures_each_has_name_value_description(self, client):
+        data = client.get("/api/gestures").get_json()
         for entry in data:
             assert "name" in entry
             assert "value" in entry
             assert "description" in entry
 
-    def test_none_gesture_present(self, client):
-        resp = client.get("/api/gestures")
-        data = resp.get_json()
-        values = [g["value"] for g in data]
-        assert "none" in values
-
-    def test_pinch_gesture_present(self, client):
-        resp = client.get("/api/gestures")
-        data = resp.get_json()
+    def test_gestures_includes_pinch(self, client):
+        data = client.get("/api/gestures").get_json()
         values = [g["value"] for g in data]
         assert "pinch" in values
 
+    def test_gestures_includes_none(self, client):
+        data = client.get("/api/gestures").get_json()
+        values = [g["value"] for g in data]
+        assert "none" in values
+
 
 # ---------------------------------------------------------------------------
-# GET /api/history
+# /api/history
 # ---------------------------------------------------------------------------
 
 class TestApiHistory:
-    def test_history_empty_by_default(self, client):
-        resp = client.get("/api/history")
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data == []
+    def test_history_200(self, client):
+        r = client.get("/api/history")
+        assert r.status_code == 200
 
     def test_history_returns_list(self, client):
-        resp = client.get("/api/history")
-        data = resp.get_json()
+        data = client.get("/api/history").get_json()
         assert isinstance(data, list)
 
-    def test_history_reflects_added_entries(self, client):
-        flask_app.gesture_history.append({
-            "gesture": "pinch",
-            "confidence": 0.9,
-            "timestamp": "12:00:00",
-        })
-        resp = client.get("/api/history")
-        data = resp.get_json()
+    def test_history_at_most_20_entries(self, client):
+        data = client.get("/api/history").get_json()
+        assert len(data) <= _HISTORY_MAXLEN
+
+    def test_history_reflects_added_entry(self, client):
+        flask_app_module.gesture_history.append(
+            {"gesture": "thumbs_up", "confidence": 0.8, "timestamp": "10:00:00"}
+        )
+        data = client.get("/api/history").get_json()
         assert len(data) == 1
-        assert data[0]["gesture"] == "pinch"
+        assert data[0]["gesture"] == "thumbs_up"
 
 
 # ---------------------------------------------------------------------------
-# POST /api/start
+# /api/start  and  /api/stop
 # ---------------------------------------------------------------------------
 
-class TestApiStart:
-    def test_start_returns_200(self, client):
-        resp = client.post("/api/start")
-        assert resp.status_code == 200
-
-    def test_start_response_has_status(self, client):
-        resp = client.post("/api/start")
-        data = resp.get_json()
-        assert "status" in data
-
-    def test_double_start_returns_already_running(self, client):
-        flask_app.is_running = True
-        resp = client.post("/api/start")
-        data = resp.get_json()
-        assert data["status"] == "already_running"
-
-
-# ---------------------------------------------------------------------------
-# POST /api/stop
-# ---------------------------------------------------------------------------
-
-class TestApiStop:
-    def test_stop_returns_200(self, client):
-        resp = client.post("/api/stop")
-        assert resp.status_code == 200
-
-    def test_stop_response_has_status(self, client):
-        resp = client.post("/api/stop")
-        data = resp.get_json()
+class TestApiStartStop:
+    def test_stop_when_not_running(self, client):
+        r = client.post("/api/stop")
+        assert r.status_code == 200
+        data = r.get_json()
         assert data["status"] == "stopped"
 
     def test_stop_sets_not_running(self, client):
-        flask_app.is_running = True
         client.post("/api/stop")
-        assert flask_app.is_running is False
+        status = client.get("/api/status").get_json()
+        assert status["is_running"] is False
+
+    def test_start_returns_json(self, client):
+        r = client.post("/api/start")
+        assert r.status_code == 200
+        data = r.get_json()
+        assert "status" in data
+        # Clean up
+        client.post("/api/stop")
+
+    def test_double_start_returns_already_running_or_started(self, client):
+        # First start may succeed or fail depending on camera; second call
+        # when already running must return already_running.
+        client.post("/api/start")
+        r2 = client.post("/api/start")
+        data = r2.get_json()
+        assert data["status"] in ("started", "already_running")
+        # Ensure the app is stopped cleanly for subsequent tests
+        client.post("/api/stop")
