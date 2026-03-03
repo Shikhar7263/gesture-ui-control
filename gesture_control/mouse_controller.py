@@ -5,6 +5,9 @@ from typing import Tuple
 
 try:
     import pyautogui
+    # FAILSAFE is intentionally disabled: the gesture system deliberately moves
+    # the cursor to screen corners, which would otherwise trigger the pyautogui
+    # FailSafeException and crash the controller.
     pyautogui.FAILSAFE = False
     _PYAUTOGUI_AVAILABLE = True
 except ImportError:

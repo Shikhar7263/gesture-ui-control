@@ -64,7 +64,7 @@ real time.
 |---|---|---|
 | **Open Palm** | All 5 fingers extended | — (reference pose) |
 | **Fist** | All fingers curled | Stop media |
-| **Pinch** | Thumb + index tips touching (< 5 % frame) | Left click |
+| **Pinch** | Thumb + index tips touching (< 0.05 normalized distance) | Left click |
 | **Thumbs Up** | Only thumb extended upward | Play / Pause media |
 | **Peace Sign** | Index + middle fingers up | — |
 | **OK Sign** | Thumb + index circle, other fingers extended | OK |
