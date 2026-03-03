@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gesture UI Control</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"
+          integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"
+          crossorigin="anonymous"></script>
+  <style>
+    /* ── CSS variables ───────────────────────────────────────────── */
+    :root {
+      --bg-deep:    #1a1a2e;
+      --bg-mid:     #16213e;
+      --bg-panel:   #0f3460;
+      --accent:     #e94560;
+      --accent-dim: #c73652;
+      --text:       #e0e0e0;
+      --text-dim:   #9aa0b0;
+      --green:      #00e676;
+      --radius:     10px;
+      --shadow:     0 4px 20px rgba(0,0,0,.4);
+    }
+
+    /* ── Reset & base ────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Layout ──────────────────────────────────────────────────── */
+    header {
+      background: var(--bg-panel);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }
+    header h1 { font-size: 1.4rem; letter-spacing: 1px; }
+    header h1 span { color: var(--accent); }
+
+    #conn-badge {
+      font-size: .8rem;
+      padding: .25rem .75rem;
+      border-radius: 20px;
+      background: #333;
+      transition: background .3s;
+    }
+    #conn-badge.connected { background: var(--green); color: #000; }
+
+    main {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 1.5rem;
+      padding: 1.5rem 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ── Panels ──────────────────────────────────────────────────── */
+    .panel {
+      background: var(--bg-mid);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .panel h2 {
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--bg-panel);
+      padding-bottom: .5rem;
+    }
+
+    /* ── Video ───────────────────────────────────────────────────── */
+    #video-wrap {
+      position: relative;
+      background: #000;
+      border-radius: var(--radius);
+      overflow: hidden;
+      aspect-ratio: 4/3;
+    }
+    #video-feed {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* ── Gesture status ──────────────────────────────────────────── */
+    #gesture-label {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: .5rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    #confidence-bar-wrap {
+      background: #333;
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+      margin-bottom: .75rem;
+    }
+    #confidence-bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width .3s;
+    }
+    #confidence-text { font-size: .85rem; color: var(--text-dim); }
+
+    /* ── Buttons ─────────────────────────────────────────────────── */
+    .btn {
+      display: inline-block;
+      padding: .55rem 1.4rem;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 600;
+      transition: background .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-secondary { background: var(--bg-panel); color: var(--text); }
+    .btn-secondary:hover { background: #1a4a80; }
+    #controls { display: flex; gap: .75rem; margin-top: 1rem; }
+
+    /* ── History ─────────────────────────────────────────────────── */
+    #history-list {
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: .85rem;
+    }
+    #history-list li {
+      display: flex;
+      justify-content: space-between;
+      padding: .35rem .5rem;
+      border-bottom: 1px solid #1e2a40;
+    }
+    #history-list li:last-child { border-bottom: none; }
+    .hist-gesture { color: var(--green); font-weight: 600; }
+    .hist-time { color: var(--text-dim); font-size: .78rem; }
+
+    /* ── Gesture reference ───────────────────────────────────────── */
+    .gesture-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: .6rem;
+    }
+    .gesture-card {
+      background: var(--bg-panel);
+      border-radius: 8px;
+      padding: .65rem .8rem;
+      font-size: .82rem;
+    }
+    .gesture-card .gname {
+      color: var(--accent);
+      font-weight: 700;
+      font-size: .88rem;
+      margin-bottom: .2rem;
+    }
+    .gesture-card .gdesc { color: var(--text-dim); }
+
+    /* ── Settings ────────────────────────────────────────────────── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: .85rem;
+    }
+    .setting-row label { font-size: .88rem; color: var(--text-dim); }
+    .setting-row input[type="range"] { width: 140px; accent-color: var(--accent); }
+    .setting-row input[type="number"] {
+      width: 70px;
+      background: var(--bg-panel);
+      border: 1px solid #2a3f60;
+      border-radius: 4px;
+      color: var(--text);
+      padding: .2rem .4rem;
+      font-size: .88rem;
+    }
+    .setting-row input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+    #settings-status { font-size: .8rem; color: var(--green); margin-top: .5rem; min-height: 1rem; }
+
+    /* ── Scrollbar ───────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bg-panel); border-radius: 3px; }
+
+    /* ── Right column ────────────────────────────────────────────── */
+    .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Gesture <span>UI</span> Control</h1>
+  <span id="conn-badge">● Disconnected</span>
+</header>
+
+<main>
+  <!-- Left column: video + controls + history -->
+  <div>
+    <!-- Video -->
+    <div class="panel" style="padding:0;overflow:hidden;margin-bottom:1.5rem;">
+      <div id="video-wrap">
+        <img id="video-feed" src="/video_feed" alt="Live feed" />
+      </div>
+    </div>
+
+    <!-- Gesture status + controls -->
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <h2>Current Gesture</h2>
+      <div id="gesture-label">NONE</div>
+      <div id="confidence-bar-wrap"><div id="confidence-bar"></div></div>
+      <div id="confidence-text">Confidence: 0%</div>
+      <div id="controls">
+        <button class="btn btn-primary" id="btn-start" onclick="startDetection()">▶ Start</button>
+        <button class="btn btn-secondary" id="btn-stop" onclick="stopDetection()">■ Stop</button>
+      </div>
+    </div>
+
+    <!-- Gesture history -->
+    <div class="panel">
+      <h2>Gesture History</h2>
+      <ul id="history-list"><li><span class="hist-gesture">—</span></li></ul>
+    </div>
+  </div>
+
+  <!-- Right column -->
+  <div class="right-col">
+
+    <!-- Gesture reference -->
+    <div class="panel">
+      <h2>Gesture Reference</h2>
+      <div class="gesture-grid" id="gesture-ref"></div>
+    </div>
+
+    <!-- Settings -->
+    <div class="panel">
+      <h2>Settings</h2>
+
+      <div class="setting-row">
+        <label>Mouse Smoothing</label>
+        <input type="range" id="s-mouse-smoothing" min="0" max="0.99" step="0.01" value="0.5"
+               oninput="document.getElementById('v-mouse-smoothing').textContent=this.value">
+        <span id="v-mouse-smoothing" style="font-size:.82rem;width:30px;text-align:right;">0.5</span>
+      </div>
+
+      <div class="setting-row">
+        <label>Scroll Speed</label>
+        <input type="range" id="s-scroll-speed" min="1" max="20" step="1" value="3"
+               oninput="document.getElementById('v-scroll-speed').textContent=this.value">
+        <span id="v-scroll-speed" style="font-size:.82rem;width:30px;text-align:right;">3</span>
+      </div>
+
+      <div class="setting-row">
+        <label>Click Cooldown (s)</label>
+        <input type="number" id="s-click-cooldown" min="0.05" max="2" step="0.05" value="0.3">
+      </div>
+
+      <div class="setting-row">
+        <label>Detection Confidence</label>
+        <input type="range" id="s-det-conf" min="0.3" max="1" step="0.05" value="0.7"
+               oninput="document.getElementById('v-det-conf').textContent=this.value">
+        <span id="v-det-conf" style="font-size:.82rem;width:30px;text-align:right;">0.7</span>
+      </div>
+
+      <div class="setting-row">
+        <label>Mouse Control</label>
+        <input type="checkbox" id="s-mouse-ctrl" checked>
+      </div>
+
+      <div class="setting-row">
+        <label>Keyboard Control</label>
+        <input type="checkbox" id="s-kb-ctrl" checked>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveSettings()" style="width:100%;">Save Settings</button>
+      <div id="settings-status"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  // ── SocketIO ──────────────────────────────────────────────────────
+  const socket = io();
+
+  socket.on('connect', () => {
+    const badge = document.getElementById('conn-badge');
+    badge.textContent = '● Connected';
+    badge.classList.add('connected');
+  });
+  socket.on('disconnect', () => {
+    const badge = document.getElementById('conn-badge');
+    badge.textContent = '● Disconnected';
+    badge.classList.remove('connected');
+  });
+
+  socket.on('gesture_event', data => {
+    updateGestureUI(data.gesture, data.confidence);
+    prependHistory(data);
+  });
+
+  // ── Gesture UI ────────────────────────────────────────────────────
+  function updateGestureUI(gesture, confidence) {
+    document.getElementById('gesture-label').textContent = gesture.toUpperCase().replace(/_/g, ' ');
+    const pct = Math.round(confidence * 100);
+    document.getElementById('confidence-bar').style.width = pct + '%';
+    document.getElementById('confidence-text').textContent = `Confidence: ${pct}%`;
+  }
+
+  function prependHistory(entry) {
+    const list = document.getElementById('history-list');
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="hist-gesture">${entry.gesture.replace(/_/g,' ')}</span>
+                    <span class="hist-time">${entry.timestamp || ''} &nbsp; ${Math.round((entry.confidence||0)*100)}%</span>`;
+    list.prepend(li);
+    // Keep at most 10 visible entries
+    while (list.children.length > 10) list.removeChild(list.lastChild);
+  }
+
+  // ── Start / Stop ──────────────────────────────────────────────────
+  async function startDetection() {
+    await fetch('/api/start', { method: 'POST' });
+    refreshStatus();
+  }
+
+  async function stopDetection() {
+    await fetch('/api/stop', { method: 'POST' });
+    refreshStatus();
+  }
+
+  // ── Status / history polling ──────────────────────────────────────
+  async function refreshStatus() {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    const startBtn = document.getElementById('btn-start');
+    const stopBtn  = document.getElementById('btn-stop');
+    startBtn.disabled = data.is_running;
+    stopBtn.disabled  = !data.is_running;
+    startBtn.style.opacity = data.is_running ? '.5' : '1';
+    stopBtn.style.opacity  = !data.is_running ? '.5' : '1';
+  }
+
+  async function pollHistory() {
+    try {
+      const res = await fetch('/api/history');
+      const history = await res.json();
+      const list = document.getElementById('history-list');
+      list.innerHTML = '';
+      [...history].reverse().forEach(entry => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="hist-gesture">${entry.gesture.replace(/_/g,' ')}</span>
+                        <span class="hist-time">${entry.timestamp || ''} &nbsp; ${Math.round((entry.confidence||0)*100)}%</span>`;
+        list.appendChild(li);
+      });
+    } catch(e) { /* ignore */ }
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────
+  async function loadSettings() {
+    try {
+      const res = await fetch('/api/config');
+      const cfg = await res.json();
+      document.getElementById('s-mouse-smoothing').value = cfg.mouse_smoothing;
+      document.getElementById('v-mouse-smoothing').textContent = cfg.mouse_smoothing;
+      document.getElementById('s-scroll-speed').value = cfg.scroll_speed;
+      document.getElementById('v-scroll-speed').textContent = cfg.scroll_speed;
+      document.getElementById('s-click-cooldown').value = cfg.click_cooldown;
+      document.getElementById('s-det-conf').value = cfg.min_detection_confidence;
+      document.getElementById('v-det-conf').textContent = cfg.min_detection_confidence;
+      document.getElementById('s-mouse-ctrl').checked = cfg.enable_mouse_control;
+      document.getElementById('s-kb-ctrl').checked = cfg.enable_keyboard_control;
+    } catch(e) { /* ignore */ }
+  }
+
+  async function saveSettings() {
+    const payload = {
+      mouse_smoothing: parseFloat(document.getElementById('s-mouse-smoothing').value),
+      scroll_speed: parseInt(document.getElementById('s-scroll-speed').value),
+      click_cooldown: parseFloat(document.getElementById('s-click-cooldown').value),
+      min_detection_confidence: parseFloat(document.getElementById('s-det-conf').value),
+      enable_mouse_control: document.getElementById('s-mouse-ctrl').checked,
+      enable_keyboard_control: document.getElementById('s-kb-ctrl').checked,
+    };
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    const status = document.getElementById('settings-status');
+    if (data.status === 'ok') {
+      status.textContent = '✓ Settings saved';
+      setTimeout(() => { status.textContent = ''; }, 2000);
+    }
+  }
+
+  // ── Gesture reference ─────────────────────────────────────────────
+  async function loadGestureReference() {
+    try {
+      const res = await fetch('/api/gestures');
+      const gestures = await res.json();
+      const grid = document.getElementById('gesture-ref');
+      grid.innerHTML = '';
+      gestures.filter(g => g.value !== 'none').forEach(g => {
+        const card = document.createElement('div');
+        card.className = 'gesture-card';
+        card.innerHTML = `<div class="gname">${g.name.replace(/_/g,' ')}</div>
+                          <div class="gdesc">${g.description}</div>`;
+        grid.appendChild(card);
+      });
+    } catch(e) { /* ignore */ }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────
+  window.addEventListener('load', () => {
+    refreshStatus();
+    loadSettings();
+    loadGestureReference();
+    setInterval(pollHistory, 2000);
+  });
+</script>
+</body>
+</html>
