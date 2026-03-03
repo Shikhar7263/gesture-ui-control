@@ -1,0 +1,25 @@
+/* Additional styles for Gesture UI Control */
+/* Most styling is handled inline in index.html via CSS variables.
+   Add component-specific overrides or new components here. */
+
+/* Smooth image rendering for the video feed */
+#video-feed {
+  image-rendering: auto;
+}
+
+/* Pulse animation for the connected badge */
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.5); }
+  70%  { box-shadow: 0 0 0 6px rgba(0, 230, 118, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }
+}
+
+#conn-badge.connected {
+  animation: pulse 2s infinite;
+}
+
+/* Highlight active gesture card */
+.gesture-card.active {
+  border: 1px solid var(--accent);
+  background: #1a3a5e;
+}
