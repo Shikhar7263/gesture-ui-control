@@ -7,6 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"
           integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"
           crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <style>
     /* ── CSS variables ───────────────────────────────────────────── */
     :root {
@@ -298,6 +299,7 @@
   </div>
 </main>
 
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script>
   // ── SocketIO ──────────────────────────────────────────────────────
   const socket = io();
@@ -319,18 +321,23 @@
   });
 
   // ── Gesture UI ────────────────────────────────────────────────────
+  let _activeGestureCard = null;
+
   function updateGestureUI(gesture, confidence) {
-    document.getElementById('gesture-label').textContent = gesture.toUpperCase().replace(/_/g, ' ');
-    const pct = Math.round(confidence * 100);
-    document.getElementById('confidence-bar').style.width = pct + '%';
-    document.getElementById('confidence-text').textContent = `Confidence: ${pct}%`;
+    document.getElementById('gesture-label').textContent = formatGestureLabel(gesture);
+    document.getElementById('confidence-bar').style.width = Math.round(confidence * 100) + '%';
+    document.getElementById('confidence-text').textContent = `Confidence: ${formatConfidence(confidence)}`;
+    // Highlight the matching card; use cached reference to avoid repeated queries
+    if (_activeGestureCard) _activeGestureCard.classList.remove('active');
+    _activeGestureCard = document.querySelector(`.gesture-card[data-gesture="${gesture}"]`);
+    if (_activeGestureCard) _activeGestureCard.classList.add('active');
   }
 
   function prependHistory(entry) {
     const list = document.getElementById('history-list');
     const li = document.createElement('li');
-    li.innerHTML = `<span class="hist-gesture">${entry.gesture.replace(/_/g,' ')}</span>
-                    <span class="hist-time">${entry.timestamp || ''} &nbsp; ${Math.round((entry.confidence||0)*100)}%</span>`;
+    li.innerHTML = `<span class="hist-gesture">${formatGestureLabel(entry.gesture)}</span>
+                    <span class="hist-time">${entry.timestamp || ''} &nbsp; ${formatConfidence(entry.confidence || 0)}</span>`;
     list.prepend(li);
     // Keep at most 10 visible entries
     while (list.children.length > 10) list.removeChild(list.lastChild);
@@ -367,8 +374,8 @@
       list.innerHTML = '';
       [...history].reverse().forEach(entry => {
         const li = document.createElement('li');
-        li.innerHTML = `<span class="hist-gesture">${entry.gesture.replace(/_/g,' ')}</span>
-                        <span class="hist-time">${entry.timestamp || ''} &nbsp; ${Math.round((entry.confidence||0)*100)}%</span>`;
+        li.innerHTML = `<span class="hist-gesture">${formatGestureLabel(entry.gesture)}</span>
+                        <span class="hist-time">${entry.timestamp || ''} &nbsp; ${formatConfidence(entry.confidence || 0)}</span>`;
         list.appendChild(li);
       });
     } catch(e) { /* ignore */ }
@@ -423,6 +430,7 @@
       gestures.filter(g => g.value !== 'none').forEach(g => {
         const card = document.createElement('div');
         card.className = 'gesture-card';
+        card.dataset.gesture = g.value;
         card.innerHTML = `<div class="gname">${g.name.replace(/_/g,' ')}</div>
                           <div class="gdesc">${g.description}</div>`;
         grid.appendChild(card);
